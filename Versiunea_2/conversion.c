@@ -100,6 +100,7 @@ int convert_fpga(uint32_t *yuv_buffer, uint32_t *rgb_buffer, uint32_t WIDTH, uin
   // se poate realiza scrierea la aceeasi adresa si imediat ce ajung la fpga, 
   //datele sunt stocate intr-un buffer si convertite si puse in alt buffer de iesre
   volatile uint32_t *y0u0y1v0 = (volatile uint32_t *)(map_base + 0x00000010); 
+  volatile uint32_t *transfer_len = (volatile uint32_t *)(map_base + 0x00000014); // cate transferuri de scriere se por executa 
   volatile uint32_t *rgb0 = (volatile uint32_t *)(map_base + 0x00000030);
   volatile uint32_t *status = (volatile uint32_t *) (map_base + 0x00000020);
 
@@ -110,8 +111,9 @@ int convert_fpga(uint32_t *yuv_buffer, uint32_t *rgb_buffer, uint32_t WIDTH, uin
   for(uint64_t i = 0; i < total_uint32_yuv; i += 16)
   {
     size_t remaining_yuv = total_uint32_yuv - i;
-    size_t to_send = (remaining_yuv < 16) ? remaining_yuv : 16;
+    uint32_t to_send = (remaining_yuv < 16) ? remaining_yuv : 16;
 
+    *transfer_len = to_send;
     // se fac 16 (sau cate mai raman) scrieri de 32 de biti catre FPGA
     for(size_t j = 0; j < to_send; j++)
       *y0u0y1v0 = yuv_buffer[i + j];
@@ -144,11 +146,14 @@ int convert_fpga(uint32_t *yuv_buffer, uint32_t *rgb_buffer, uint32_t WIDTH, uin
     }
   }
 
+  printf("Numar teoretic de usleep : %d\n", waiting_loop);
+
   munmap(map_base, MAP_SIZE);
   close(mem_fd);
   return 0;
 }
 
+// nu se mai foloseste, se face compararea la nivel de fisier 
 void compare_rgb(uint32_t *rgb_buffer_fpga, uint8_t *rgb_buffer_cpu, uint32_t WIDTH, uint32_t HEIGHT) 
 {
 
